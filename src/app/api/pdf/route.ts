@@ -2,9 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { DocumentKind } from "@/generated/prisma/enums";
 import { resolveFileName } from "@/lib/file-name";
+import { logServerError } from "@/lib/log";
 import { holdPdf, pdfDownload } from "@/lib/pdf/downloads";
 import { countPdfPages, printBasePath } from "@/lib/pdf/pages";
-import { renderPdf } from "@/lib/pdf/render";
+import { isPdfRenderError, renderPdf } from "@/lib/pdf/render";
 import { prisma } from "@/lib/prisma";
 import { loadProfileName } from "@/lib/profile-data";
 import { loadSettings } from "@/lib/settings-data";
@@ -41,6 +42,23 @@ export const POST = route(async (request) => {
   return NextResponse.json({ url: `/api/pdf/${holdPdf(rendered.pdf, rendered.fileName)}` });
 });
 
+function renderFallback(request: NextRequest, printPath: string, error: unknown): Response {
+  if (isPdfRenderError(error)) {
+    logServerError(`PDF render fallback for ${printPath}`, error);
+    if (request.method === "GET") {
+      return NextResponse.redirect(new URL(printPath, request.url));
+    }
+    return NextResponse.json(
+      {
+        error: error.message,
+        printUrl: printPath,
+      },
+      { status: 422 },
+    );
+  }
+  throw error;
+}
+
 /** The PDF and file name of the document the query asks for, or a 404 response. */
 async function renderRequested(request: NextRequest): Promise<{ pdf: Uint8Array; fileName: string } | Response> {
   const params = request.nextUrl.searchParams;
@@ -49,10 +67,18 @@ async function renderRequested(request: NextRequest): Promise<{ pdf: Uint8Array;
   const date = new Date();
 
   if (doc === "base") {
-    // "Fit to one page" (public issue 69): squeezed a step at a time until it fits, as the preview does.
-    let pdf = await renderPdf(printBasePath());
-    for (let fit = 1; settings.fitBaseResume && fit <= FIT_LEVELS && countPdfPages(pdf) > 1; fit++) pdf = await renderPdf(printBasePath(fit));
-    return { pdf, fileName: resolveFileName(settings.fileNamePattern, { name, doc: DocumentKind.RESUME, date }) };
+    const printPath = printBasePath();
+    const fileName = resolveFileName(settings.fileNamePattern, { name, doc: DocumentKind.RESUME, date });
+    try {
+      // "Fit to one page" (public issue 69): squeezed a step at a time until it fits, as the preview does.
+      let pdf = await renderPdf(printPath);
+      for (let fit = 1; settings.fitBaseResume && fit <= FIT_LEVELS && countPdfPages(pdf) > 1; fit++) {
+        pdf = await renderPdf(printBasePath(fit));
+      }
+      return { pdf, fileName };
+    } catch (error) {
+      return renderFallback(request, printPath, error);
+    }
   }
 
   if (doc !== "resume" && doc !== "letter") return notFound("There's no such document to download.");
@@ -68,8 +94,19 @@ async function renderRequested(request: NextRequest): Promise<{ pdf: Uint8Array;
     return notFound(doc === "resume" ? "This application has no tailored resume." : "This application has no cover letter.");
   }
 
-  return {
-    pdf: await renderPdf(`/print/${doc}/${id}`),
-    fileName: resolveFileName(settings.fileNamePattern, { name, company: application.company, role: application.role, doc: TAILORED[doc], date }),
-  };
+  const printPath = `/print/${doc}/${id}`;
+  const fileName = resolveFileName(settings.fileNamePattern, {
+    name,
+    company: application.company,
+    role: application.role,
+    doc: TAILORED[doc],
+    date,
+  });
+
+  try {
+    const pdf = await renderPdf(printPath);
+    return { pdf, fileName };
+  } catch (error) {
+    return renderFallback(request, printPath, error);
+  }
 }

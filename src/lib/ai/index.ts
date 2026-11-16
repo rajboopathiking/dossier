@@ -8,12 +8,14 @@ import { AiError } from "./errors";
 import { providerOption } from "./provider-options";
 import type { AIProvider } from "./provider";
 import { AnthropicProvider } from "./providers/anthropic";
+import { AgyCliProvider } from "./providers/agy-cli";
 import { LocalProvider } from "./providers/local";
 import { LmStudioProvider } from "./providers/lmstudio";
 import { MistralProvider } from "./providers/mistral";
 import { OpenAICompatibleProvider } from "./providers/openai-compatible";
 
 export { AiError } from "./errors";
+export { getAgentAiProvider } from "./agent-provider";
 export type { AIProvider, ChatMessage, CompletionRequest, JsonCompletionRequest } from "./provider";
 
 /**
@@ -27,6 +29,9 @@ export function createProvider(config: AiConfig): AIProvider {
     case AiProvider.LOCAL:
       return new LocalProvider(baseUrl, model, timeoutMs, recordUsage);
     case AiProvider.OPENAI:
+      if (baseUrl === "local" || baseUrl === "local-cli" || baseUrl.toLowerCase().includes("agy")) {
+        return new AgyCliProvider(model, timeoutMs, recordUsage);
+      }
       return new OpenAICompatibleProvider("OPENAI", baseUrl, apiKey, model, timeoutMs, recordUsage);
     case AiProvider.ANTHROPIC:
       return new AnthropicProvider(baseUrl, apiKey, model, timeoutMs, recordUsage);

@@ -7,8 +7,9 @@ import { z } from "zod";
 import { AiProvider, Creativity, DateFormat, JobStatus, PaperSize, Tone } from "@/generated/prisma/enums";
 import { action, ActionError } from "@/lib/action";
 import { lockAgentSearches } from "@/lib/agent/searches";
+import { executeAutomationCycle, testCustomAutomationConnection } from "@/lib/ai/automation";
 import { AiError, createProvider } from "@/lib/ai";
-import { applyApiKeyChange } from "@/lib/ai/api-key";
+import { apiKeyState, applyApiKeyChange, decryptApiKey } from "@/lib/ai/api-key";
 import { keyStateOf, loadAiConfig, resolveAiConfig, sameServer } from "@/lib/ai/config";
 import { AI_TIMEOUT_LIMITS, type KeyState } from "@/lib/ai/provider-options";
 import { DOCUMENT_LANGUAGES } from "@/lib/document-language";
@@ -108,8 +109,7 @@ export const listAiModels = action(z.object({}), async () => {
     const provider = createProvider(await loadAiConfig());
     return { models: await provider.listModels(AbortSignal.timeout(15_000)), problem: null };
   } catch (error) {
-    if (error instanceof AiError) return { models: [], problem: error.message };
-    throw error;
+    return { models: [], problem: error instanceof Error ? error.message : "Couldn't list models" };
   }
 });
 
@@ -124,8 +124,7 @@ export const testAiConnection = action(z.object({}), async () => {
     const { model, latencyMs } = await provider.test();
     return { connected: true as const, model, seconds: Math.round(latencyMs / 100) / 10 };
   } catch (error) {
-    if (error instanceof AiError) return { connected: false as const, message: error.message };
-    throw error;
+    return { connected: false as const, message: error instanceof Error ? error.message : "Connection failed." };
   }
 });
 
@@ -391,4 +390,124 @@ export const removeConnectorRedirect = action(z.object({ uri: z.string().max(200
   const redirects = (await loadSettings()).connectorRedirects.filter((entry) => entry !== uri);
   await saveSettings({ connectorRedirects: redirects });
   return { redirects };
+});
+
+// Settings → Automation actions
+
+export const saveAutomationSettings = action(
+  z.object({
+    automationCustomApi: z.boolean().optional(),
+    automationPreset: z.enum(["opencode", "agy", "custom"]).optional(),
+    automationBaseUrl: z.string().trim().max(500).optional(),
+    automationModel: z.string().trim().max(200).optional(),
+    automationTimeoutSeconds: z.number().int().min(5).max(3600).nullable().optional(),
+    automationIntervalHours: z.number().int().min(1).max(48).optional(),
+    automationAutoFollowUp: z.boolean().optional(),
+    automationFollowUpDays: z.number().int().min(1).max(30).optional(),
+    automationAtsOptimize: z.boolean().optional(),
+    automationAutoClassify: z.boolean().optional(),
+    agentAiEngine: z.enum(["primary", "opencode", "agy", "custom"]).optional(),
+  }),
+  async (changes) => {
+    await saveSettings({
+      ...(changes.automationCustomApi !== undefined ? { automationCustomApi: changes.automationCustomApi } : {}),
+      ...(changes.automationPreset !== undefined ? { automationPreset: changes.automationPreset } : {}),
+      ...(changes.automationBaseUrl !== undefined ? { automationBaseUrl: changes.automationBaseUrl || null } : {}),
+      ...(changes.automationModel !== undefined ? { automationModel: changes.automationModel || null } : {}),
+      ...(changes.automationTimeoutSeconds !== undefined ? { automationTimeoutSeconds: changes.automationTimeoutSeconds } : {}),
+      ...(changes.automationIntervalHours !== undefined ? { automationIntervalHours: changes.automationIntervalHours } : {}),
+      ...(changes.automationAutoFollowUp !== undefined ? { automationAutoFollowUp: changes.automationAutoFollowUp } : {}),
+      ...(changes.automationFollowUpDays !== undefined ? { automationFollowUpDays: changes.automationFollowUpDays } : {}),
+      ...(changes.automationAtsOptimize !== undefined ? { automationAtsOptimize: changes.automationAtsOptimize } : {}),
+      ...(changes.automationAutoClassify !== undefined ? { automationAutoClassify: changes.automationAutoClassify } : {}),
+      ...(changes.agentAiEngine !== undefined ? { agentAiEngine: changes.agentAiEngine } : {}),
+    });
+    revalidatePath("/settings");
+    revalidatePath("/agent");
+    const updated = await loadSettings();
+    return {
+      customApi: updated.automationCustomApi,
+      preset: updated.automationPreset,
+      baseUrl: updated.automationBaseUrl ?? "",
+      model: updated.automationModel ?? "",
+      timeoutSeconds: updated.automationTimeoutSeconds,
+      intervalHours: updated.automationIntervalHours,
+      autoFollowUp: updated.automationAutoFollowUp,
+      followUpDays: updated.automationFollowUpDays,
+      atsOptimize: updated.automationAtsOptimize,
+      autoClassify: updated.automationAutoClassify,
+    };
+  },
+);
+
+export const saveAutomationApiKey = action(
+  z.object({
+    change: z.discriminatedUnion("action", [
+      z.object({ action: z.literal("set"), value: z.string().trim().min(1).max(1000) }),
+      z.object({ action: z.literal("clear") }),
+    ]),
+  }),
+  async ({ change }) => {
+    const current = await loadSettings();
+    const updatedKey = applyApiKeyChange(current.automationApiKeyEnc, change);
+    await saveSettings({ automationApiKeyEnc: updatedKey });
+    return { keyState: apiKeyState(updatedKey) };
+  },
+);
+
+export const testAutomationConnection = action(
+  z.object({
+    baseUrl: z.string().trim().max(500).optional(),
+    model: z.string().trim().max(200).optional(),
+    useCustom: z.boolean().optional(),
+  }),
+  async ({ baseUrl, model, useCustom }) => {
+    try {
+      const current = await loadSettings();
+      const customApi = useCustom ?? current.automationCustomApi;
+      if (!customApi) {
+        // Test primary provider
+        const config = await loadAiConfig();
+        const provider = createProvider({ ...config, timeoutMs: Math.min(config.timeoutMs, TEST_TIMEOUT_MS) });
+        const { model: m, latencyMs } = await provider.test();
+        return { connected: true as const, model: m, seconds: Math.round(latencyMs / 100) / 10 };
+      }
+
+      let apiKey: string | null = null;
+      if (current.automationApiKeyEnc) {
+        try {
+          apiKey = decryptApiKey(current.automationApiKeyEnc);
+        } catch {
+          apiKey = null;
+        }
+      }
+
+      const effectiveUrl = baseUrl || current.automationBaseUrl || "";
+      const effectiveModel = model || current.automationModel || "";
+
+      return await testCustomAutomationConnection({
+        baseUrl: effectiveUrl,
+        model: effectiveModel,
+        apiKey,
+        timeoutSeconds: current.automationTimeoutSeconds ?? 60,
+      });
+    } catch (error) {
+      return { connected: false as const, model: model ?? "", message: error instanceof Error ? error.message : "Connection test failed." };
+    }
+  },
+);
+
+export const runAutomationNow = action(z.object({}), async () => {
+  try {
+    const result = await executeAutomationCycle();
+    revalidatePath("/settings");
+    revalidatePath("/agent");
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Automation execution encountered an error.",
+      stats: { applicationsChecked: 0, followUpsSuggested: 0, agentCandidatesWaiting: 0, modelUsed: "none" },
+    };
+  }
 });

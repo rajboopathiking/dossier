@@ -133,7 +133,11 @@ export function AgentScreen({ view }: { view: AgentView }) {
         <Card padding="none" className="flex flex-col gap-4 px-7 py-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-serif text-section">Recurring searches</h2>
-            <Link href="/settings?section=agent" className="text-meta text-muted underline underline-offset-2">Manage searches and shared schedule</Link>
+            <div className="flex items-center gap-3">
+              <Link href="/settings?section=automation" className="text-meta text-muted underline underline-offset-2">Custom API & automations</Link>
+              <span className="text-muted text-xs">·</span>
+              <Link href="/settings?section=agent" className="text-meta text-muted underline underline-offset-2">Manage searches</Link>
+            </div>
           </div>
           {view.searches.length === 0 ? <p className="text-meta text-muted">No saved searches yet.</p> : <ol className="flex flex-col gap-3">
             {view.searches.map((search) => {

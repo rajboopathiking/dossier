@@ -13,6 +13,8 @@ export type Server = {
   name: string;
   /** Its domain; subdomains count too. */
   domain: string;
+  /** Custom matcher for addresses like localhost ports or other host patterns. */
+  matches?: (url: URL) => boolean;
   /** The API's path for the one entered (without a trailing slash), when people tend to enter another. */
   path?: (path: string) => string;
   /** Headers for every request, made once per provider: Dossier makes one for each task. */
@@ -46,17 +48,28 @@ export const SERVERS: readonly Server[] = [
     chat: { provider: { data_collection: "deny" } },
   },
   {
-    // OpenCode's Go and Zen plans. Chat refuses a request without a session
-    // header ("MissingSessionID"), and OpenCode asks clients to name
-    // themselves in the user agent. Its docs give chat at …/openai/v1, where
-    // the model list is a 404; both work at …/v1.
+    // OpenCode's Go and Zen plans, and local OpenCode instances (port 4096).
+    // Chat refuses a request without a session header ("MissingSessionID"), and
+    // OpenCode asks clients to name themselves in the user agent.
     name: "OpenCode",
     domain: "opencode.ai",
-    path: (path) => path.replace(/\/openai(\/v1)?$/, "/v1"),
+    matches: (url) =>
+      url.hostname === "opencode.ai" ||
+      url.hostname.endsWith(".opencode.ai") ||
+      url.hostname.includes("opencode") ||
+      ((url.hostname === "localhost" || url.hostname === "127.0.0.1") && (url.port === "4096" || url.pathname.includes("opencode"))),
+    path: (path) => (!path || path === "/" || path === "/openai" ? "/v1" : path.replace(/\/openai(\/v1)?$/, "/v1")),
     headers: () => ({
       "User-Agent": `Dossier/${appVersion} (+https://github.com/AienTech/dossier)`,
       "x-opencode-session": `ses_${randomUUID()}`,
     }),
+  },
+  {
+    // Google Generative AI / Gemini / AGY OpenAI-compatible endpoint (#380)
+    name: "Google AI (AGY / Gemini)",
+    domain: "googleapis.com",
+    matches: (url) => url.hostname.includes("googleapis.com") || url.hostname.includes("generativelanguage"),
+    path: (path) => (!path || path === "/" || path === "/v1" || path === "/v1beta" ? "/v1beta/openai" : path),
   },
   {
     // Ollama's cloud (https://ollama.com/v1) accepts `response_format` but
@@ -70,8 +83,13 @@ export const SERVERS: readonly Server[] = [
 
 /** The entry for the server at `baseURL`, if it's one of them. */
 export function serverAt(baseURL: string): Server | undefined {
-  const host = URL.canParse(baseURL) ? new URL(baseURL).hostname : "";
-  return SERVERS.find(({ domain }) => host === domain || host.endsWith(`.${domain}`));
+  if (!URL.canParse(baseURL)) return undefined;
+  const parsed = new URL(baseURL);
+  const host = parsed.hostname.toLowerCase();
+  return SERVERS.find((server) => {
+    if (server.matches?.(parsed)) return true;
+    return host === server.domain || host.endsWith(`.${server.domain}`);
+  });
 }
 
 /**

@@ -55,7 +55,13 @@ export function DownloadPdfButton({
     try {
       const response = await fetch(href, held ? { method: "POST" } : undefined);
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as { error?: string; printUrl?: string } | null;
+        if (body?.printUrl) {
+          toast(body.error ?? "Opening print preview. Select 'Save as PDF' in the print dialog to save your file.");
+          const separator = body.printUrl.includes("?") ? "&" : "?";
+          window.open(`${body.printUrl}${separator}autoPrint=true`, "_blank");
+          return;
+        }
         toast(body?.error ?? messages.unexpected);
         return;
       }

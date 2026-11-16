@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getSession } from "@/lib/auth/session";
-import { renderPdf } from "@/lib/pdf/render";
+import { PdfRenderError, renderPdf } from "@/lib/pdf/render";
 import { prisma } from "@/lib/prisma";
 import { loadProfileName } from "@/lib/profile-data";
 import { settingsFromRows } from "@/lib/settings";
@@ -12,7 +12,13 @@ import { GET as GET_HELD } from "./[id]/route";
 import { GET, POST } from "./route";
 
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
-vi.mock("@/lib/pdf/render", () => ({ renderPdf: vi.fn() }));
+vi.mock("@/lib/pdf/render", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/pdf/render")>();
+  return {
+    ...actual,
+    renderPdf: vi.fn(),
+  };
+});
 vi.mock("@/lib/profile-data", () => ({ loadProfileName: vi.fn() }));
 vi.mock("@/lib/settings-data", () => ({ loadSettings: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: { application: { findUnique: vi.fn() } } }));
@@ -92,6 +98,22 @@ describe("GET /api/pdf", () => {
     const response = await get("?doc=base");
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: expect.stringMatching(/^Something went wrong/) });
+  });
+
+  it("handles PdfRenderError gracefully with fallback redirect on GET and 422 on POST", async () => {
+    vi.mocked(renderPdf).mockRejectedValue(new PdfRenderError("Headless browser unavailable", "/print/base"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const getResponse = await get("?doc=base");
+    expect(getResponse.status).toBe(307);
+    expect(getResponse.headers.get("location")).toBe("http://localhost:3000/print/base");
+
+    const postResponse = await post("?doc=base");
+    expect(postResponse.status).toBe(422);
+    expect(await postResponse.json()).toEqual({
+      error: "Headless browser unavailable",
+      printUrl: "/print/base",
+    });
   });
 
   it("downloads an application's tailored resume and cover letter (APP-12)", async () => {

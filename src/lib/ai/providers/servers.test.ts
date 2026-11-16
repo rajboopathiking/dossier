@@ -9,9 +9,14 @@ describe("apiAddress", () => {
       ["https://openrouter.ai/v1/", "https://openrouter.ai/api/v1"],
       ["https://openrouter.ai/api", "https://openrouter.ai/api/v1"],
       ["https://openrouter.ai/api/v1", "https://openrouter.ai/api/v1"],
+      ["https://opencode.ai", "https://opencode.ai/v1"],
       ["https://opencode.ai/inference/go/openai/v1", "https://opencode.ai/inference/go/v1"],
       ["https://opencode.ai/inference/go/v1", "https://opencode.ai/inference/go/v1"],
       ["https://opencode.ai/zen/v1", "https://opencode.ai/zen/v1"],
+      ["http://localhost:4096", "http://localhost:4096/v1"],
+      ["http://localhost:4096/v1", "http://localhost:4096/v1"],
+      ["https://generativelanguage.googleapis.com", "https://generativelanguage.googleapis.com/v1beta/openai"],
+      ["https://generativelanguage.googleapis.com/v1beta/openai", "https://generativelanguage.googleapis.com/v1beta/openai"],
       ["https://api.deepseek.com", "https://api.deepseek.com"],
       ["http://llama:8080/v1/", "http://llama:8080/v1/"],
     ];
@@ -32,6 +37,8 @@ describe("serverAt", () => {
   it("knows a server by its domain and subdomains, not by lookalikes", () => {
     expect(serverAt("https://api.deepseek.com/v1")?.name).toBe("DeepSeek");
     expect(serverAt("https://deepseek.com")?.name).toBe("DeepSeek");
+    expect(serverAt("http://localhost:4096/v1")?.name).toBe("OpenCode");
+    expect(serverAt("https://generativelanguage.googleapis.com/v1beta/openai")?.name).toBe("Google AI (AGY / Gemini)");
     expect(serverAt("https://notdeepseek.com/v1")).toBeUndefined();
     expect(serverAt("https://deepseek.com.example.org/v1")).toBeUndefined();
     expect(serverAt("not an address")).toBeUndefined();

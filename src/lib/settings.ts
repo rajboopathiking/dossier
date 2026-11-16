@@ -189,6 +189,8 @@ export const settingsSchema = z.object({
   agentMaxDrafts: z.coerce.number().int().min(0).max(10).catch(3),
   /** Whether a run prepares drafts for its best postings, or only scores them (off by default, #197). */
   agentAutoDraft: flag(false),
+  /** AI engine used for job agent fit scoring, reading postings, and drafting applications. */
+  agentAiEngine: z.enum(["primary", "opencode", "agy", "custom"]).catch("primary"),
   /** The latest runs, newest first. They belong to the install: exports leave them out (INSTALL_SETTINGS). */
   agentRuns: json(z.array(agentRunSchema)).catch([]),
   // Startups (#222): when the screen was last opened, since the daily refresh
@@ -260,6 +262,20 @@ export const settingsSchema = z.object({
   // without a request, such as the inbox check (time-zone.ts). It belongs
   // to the install, not its data, so exports leave it out (INSTALL_SETTINGS).
   browserTimeZone: z.string().nullable().catch(null),
+  // Advanced Automations & Custom Model API
+  automationCustomApi: flag(false),
+  automationPreset: z.enum(["opencode", "agy", "custom"]).catch("custom"),
+  automationBaseUrl: z.string().nullable().catch(null),
+  automationModel: z.string().nullable().catch(null),
+  automationApiKeyEnc: z.string().nullable().catch(null),
+  automationTimeoutSeconds: z.coerce.number().int().min(5).max(3600).nullable().catch(null),
+  automationIntervalHours: z.coerce.number().int().min(1).max(48).catch(24),
+  automationAutoFollowUp: flag(true),
+  automationFollowUpDays: z.coerce.number().int().min(1).max(30).catch(7),
+  automationAtsOptimize: flag(true),
+  automationAutoClassify: flag(true),
+  automationLastRunAt: z.string().nullable().catch(null),
+  automationLastRunMessage: z.string().nullable().catch(null),
 });
 export type SettingsData = z.output<typeof settingsSchema>;
 

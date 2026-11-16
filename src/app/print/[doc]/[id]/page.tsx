@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PrintToolbar } from "@/components/documents/print-toolbar";
 import { TailoredLetter, TailoredResume } from "@/components/documents/tailored-documents";
 import { DocumentKind } from "@/generated/prisma/enums";
 import { loadDocuments } from "@/lib/application-documents";
@@ -29,6 +30,7 @@ export default async function PrintTailoredDocumentPage({ params }: PageProps<"/
 
   return (
     <>
+      <PrintToolbar />
       <style>{printCss(document.theme, settings.paper)}</style>
       {doc === "resume" ? (
         <TailoredResume

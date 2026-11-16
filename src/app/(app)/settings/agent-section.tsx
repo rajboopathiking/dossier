@@ -8,6 +8,7 @@ import { toastResult } from "@/components/toast";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { AGENT_AI_ENGINES, type AgentAiEngine } from "@/lib/ai/automation-options";
 import type { SavedAgentSearch } from "@/lib/agent/search";
 import { AGENT_MAX_SOURCE_REQUESTS_PER_DAY } from "@/lib/agent/limits";
 import type { Country } from "@/lib/job-search/countries";
@@ -26,6 +27,7 @@ export type AgentSettings = {
   maxScores: number;
   maxDrafts: number;
   autoDraft: boolean;
+  aiEngine?: AgentAiEngine;
 };
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -163,6 +165,60 @@ export function AgentSection({
           checked={settings.autoDraft}
           onCheckedChange={(autoDraft) => change({ autoDraft })}
         />
+      </Card>
+
+      <Card padding="none" className="grid gap-y-3 px-7 py-5">
+        <div>
+          <h3 className="text-body font-medium">AI Engine for Agent Apply & Drafts</h3>
+          <p className="text-meta text-muted mt-0.5">
+            Select which AI provider powers fit scoring and application drafts (tailored resume and cover letter).
+          </p>
+        </div>
+        <Select
+          label="AI Engine"
+          value={settings.aiEngine ?? "primary"}
+          onChange={(event) => change({ aiEngine: event.target.value as AgentAiEngine })}
+        >
+          {AGENT_AI_ENGINES.map((engine) => (
+            <option key={engine.id} value={engine.id}>
+              {engine.label}
+            </option>
+          ))}
+        </Select>
+        <p className="text-meta text-muted">
+          {settings.aiEngine === "opencode" && (
+            <span>
+              Using OpenCode interpreter / API. Works with local OpenCode (http://localhost:4096) or cloud. Configure parameters in{" "}
+              <Link href="/settings?section=automation" className="underline font-medium text-foreground">
+                Settings → Automation
+              </Link>.
+            </span>
+          )}
+          {settings.aiEngine === "agy" && (
+            <span>
+              Using AGY (Google Antigravity / Gemini) model. Configure your Gemini key and model in{" "}
+              <Link href="/settings?section=automation" className="underline font-medium text-foreground">
+                Settings → Automation
+              </Link>.
+            </span>
+          )}
+          {settings.aiEngine === "custom" && (
+            <span>
+              Using custom OpenAI-compatible API. Configure custom URL, model name, and API key in{" "}
+              <Link href="/settings?section=automation" className="underline font-medium text-foreground">
+                Settings → Automation
+              </Link>.
+            </span>
+          )}
+          {(!settings.aiEngine || settings.aiEngine === "primary") && (
+            <span>
+              Using the primary model configured in{" "}
+              <Link href="/settings?section=ai" className="underline font-medium text-foreground">
+                AI provider settings
+              </Link>.
+            </span>
+          )}
+        </p>
       </Card>
 
       <p className="text-meta text-muted">

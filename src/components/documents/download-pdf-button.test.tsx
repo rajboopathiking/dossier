@@ -101,6 +101,16 @@ describe("DownloadPdfButton", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("opens print preview when server rendering is unavailable and printUrl is provided", async () => {
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "Direct PDF download is unavailable.", printUrl: "/print/base" }, { status: 422 })));
+    render(<DownloadPdfButton href="/api/pdf?doc=base">Download PDF</DownloadPdfButton>);
+    await userEvent.click(screen.getByRole("link", { name: "Download PDF" }));
+    expect(open).toHaveBeenCalledWith("/print/base?autoPrint=true", "_blank");
+    expect(toast).toHaveBeenLastCalledWith("Direct PDF download is unavailable.");
+  });
+
   it("says what it's rendering when told (E8-8)", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ url: "/api/pdf/held-2" })));
     render(

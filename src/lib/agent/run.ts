@@ -59,7 +59,7 @@ async function setupProblemFor(searches: readonly SavedAgentSearch[], config: Jo
   const searchProblem = agentSearchSetupProblem(searches);
   if (searchProblem) return searchProblem;
   // Scoring is what a run does; drafts ask the AI provider when there are any.
-  const scoring = await scoringProblem();
+  const scoring = await scoringProblem(undefined, { forAgent: true });
   if (scoring) return scoring;
   if (!config.source) return "Choose a job source in Settings → Job search first.";
   // It searches on its own, which the BA's terms forbid most clearly (#223).
@@ -212,7 +212,7 @@ export async function evaluateAgentPostings(postings: readonly FoundPosting[], c
 
   const toScore = fresh.slice(0, settings.agentMaxScores);
   await context.step(`Scoring ${toScore.length} ${toScore.length === 1 ? "posting" : "postings"}`);
-  const [score, profile] = await Promise.all([loadPostingScorer(), loadProfile()]);
+  const [score, profile] = await Promise.all([loadPostingScorer({ forAgent: true }), loadProfile()]);
   let scored = 0;
   let queued = 0;
   const kept: string[] = [];

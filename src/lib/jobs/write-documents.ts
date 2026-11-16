@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { Tone } from "@/generated/prisma/enums";
-import { getAiProvider } from "@/lib/ai";
+import { getAgentAiProvider, getAiProvider } from "@/lib/ai";
 import { loadTaskOptions } from "@/lib/ai/task-options";
 import { tailorResume, writeCoverLetter } from "@/lib/ai/tasks";
 import { extractedSchema, matchSchema, unitsSchema } from "@/lib/application-data";
@@ -36,11 +36,17 @@ export const writeDocumentsJob = defineJob({
     note: z.string().max(2000),
     /** Which documents to write (#367); the job agent and the connector write both. */
     write: z.enum(DOCUMENTS_TO_WRITE).default("both"),
+    forAgent: z.boolean().optional(),
   }),
   result: z.object({ resume: unitsSchema, resumeWith: z.string(), letter: unitsSchema, letterWith: z.string() }),
-  async run({ posting, extracted, match, tone, note, write }, { step, signal }) {
+  async run({ posting, extracted, match, tone, note, write, forAgent }, { step, signal }) {
     await step(write === "letter" ? WRITE_DOCUMENTS_STEPS[1] : WRITE_DOCUMENTS_STEPS[0]);
-    const [provider, options, fullProfile, settings] = await Promise.all([getAiProvider(), loadTaskOptions(), loadProfile(), loadSettings()]);
+    const [provider, options, fullProfile, settings] = await Promise.all([
+      forAgent ? getAgentAiProvider() : getAiProvider(),
+      loadTaskOptions(),
+      loadProfile(),
+      loadSettings(),
+    ]);
     // A section that's off on the base resume isn't written about (#297).
     const profile = withoutSectionsOff(fullProfile, settings.resumeSections);
     // "Anything I should know?" is the application's first fact (APP-15).

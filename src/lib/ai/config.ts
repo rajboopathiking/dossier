@@ -93,12 +93,15 @@ export function resolveAiConfig(saved: SavedSettings | null, source: AiEnv, secr
  * server, another host isn't. Empty means the provider's default address.
  */
 export function sameServer(provider: AiProvider, a: string | null | undefined, b: string | null | undefined): boolean {
-  const origin = (address: string | null | undefined) => {
-    const url = address?.trim() || PROVIDER_DEFAULTS[provider].baseUrl;
+  const normA = a?.trim() || "";
+  const normB = b?.trim() || "";
+  if (normA === "local" && normB === "local") return true;
+  const origin = (address: string) => {
+    const url = address || PROVIDER_DEFAULTS[provider].baseUrl;
     return URL.canParse(url) ? new URL(url).origin : null;
   };
-  const left = origin(a);
-  return left !== null && left === origin(b);
+  const left = origin(normA);
+  return left !== null && left === origin(normB);
 }
 
 /** The AI configuration in effect right now. */

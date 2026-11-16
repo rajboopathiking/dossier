@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { getAiProvider } from "@/lib/ai";
+import { getAgentAiProvider, getAiProvider } from "@/lib/ai";
 import { loadTaskOptions } from "@/lib/ai/task-options";
 import { extractPosting, matchRequirements } from "@/lib/ai/tasks";
 import { extractedSchema, matchSchema } from "@/lib/application-data";
@@ -17,16 +17,23 @@ import { defineJob } from "./runner";
  */
 export const readPostingJob = defineJob({
   type: "read-posting",
-  input: z.object({ posting: z.string().trim().min(1).max(100_000) }),
+  input: z.object({
+    posting: z.string().trim().min(1).max(100_000),
+    forAgent: z.boolean().optional(),
+  }),
   result: z.object({
     extracted: extractedSchema,
     extractedWith: z.string(),
     match: matchSchema,
     matchedWith: z.string(),
   }),
-  async run({ posting }, { step, signal }) {
+  async run({ posting, forAgent }, { step, signal }) {
     await step(READ_POSTING_STEPS[0]);
-    const [provider, options, profile] = await Promise.all([getAiProvider(), loadTaskOptions(), loadProfile()]);
+    const [provider, options, profile] = await Promise.all([
+      forAgent ? getAgentAiProvider() : getAiProvider(),
+      loadTaskOptions(),
+      loadProfile(),
+    ]);
 
     await step(READ_POSTING_STEPS[1]);
     const extraction = await extractPosting(provider, { posting }, { ...options, signal });

@@ -1,13 +1,15 @@
 import "server-only";
 
-import { getAiProvider } from "@/lib/ai";
-import { isAiConfigured } from "@/lib/ai/config";
+import { getAgentAiProvider, getAiProvider } from "@/lib/ai";
+import { decryptApiKey } from "@/lib/ai/api-key";
+import { isAiConfigured, loadAiConfig } from "@/lib/ai/config";
 import { AiError } from "@/lib/ai/errors";
 import { loadTaskOptions } from "@/lib/ai/task-options";
 import { scorePosting } from "@/lib/ai/tasks";
 import type { PostingFit } from "@/lib/fit";
 import { postingText, type FoundPosting } from "@/lib/job-search/search";
 import type { ProfileData } from "@/lib/profile";
+import { loadSettings } from "@/lib/settings-data";
 import { recordUsage } from "@/lib/usage-data";
 
 import { jevKey, loadScoringConfig, type ScoringConfig } from "./config";
@@ -25,9 +27,25 @@ export type PostingScorer = (posting: ScorablePosting, profile: ProfileData, sig
 export const AI_PROVIDER_MISSING = "Choose an AI provider in Settings → AI provider first.";
 
 /** Why postings can't be scored, in words, or null when the chosen scorer is set up. */
-export async function scoringProblem(config?: ScoringConfig): Promise<string | null> {
+export async function scoringProblem(config?: ScoringConfig, options?: { forAgent?: boolean }): Promise<string | null> {
   const settled = config ?? (await loadScoringConfig());
   if (settled.scorer === "JEV") return jevKey(settled).problem;
+  if (options?.forAgent) {
+    const settings = await loadSettings();
+    if (settings.agentAiEngine === "opencode") {
+      return null;
+    }
+    if (settings.agentAiEngine === "agy") {
+      // Local AGY CLI / bridge does not require an API key
+      return null;
+    }
+    if (settings.agentAiEngine === "custom") {
+      return null;
+    }
+    if (settings.automationCustomApi) {
+      return null;
+    }
+  }
   return (await isAiConfigured()) ? null : AI_PROVIDER_MISSING;
 }
 
@@ -35,7 +53,7 @@ export async function scoringProblem(config?: ScoringConfig): Promise<string | n
  * The scorer Settings → Scoring chose, set up once for any number of
  * postings. Fails as an AiError when it isn't set up.
  */
-export async function loadPostingScorer(): Promise<PostingScorer> {
+export async function loadPostingScorer(options?: { forAgent?: boolean }): Promise<PostingScorer> {
   const config = await loadScoringConfig();
   if (config.scorer === "JEV") {
     const jev = jevKey(config);
@@ -43,11 +61,15 @@ export async function loadPostingScorer(): Promise<PostingScorer> {
     const { key } = jev;
     return (posting, profile, signal) => scoreWithJev(posting, profile, { key, signal, onUsage: recordUsage });
   }
-  if (!(await isAiConfigured())) throw AiError.config(AI_PROVIDER_MISSING);
-  const [provider, options] = await Promise.all([getAiProvider(), loadTaskOptions()]);
+  const problem = await scoringProblem(config, options);
+  if (problem) throw AiError.config(problem);
+  const [provider, taskOptions] = await Promise.all([
+    options?.forAgent ? getAgentAiProvider() : getAiProvider(),
+    loadTaskOptions(),
+  ]);
   return async (posting, profile, signal) => {
     const { title, company, place, remote, salary } = posting;
-    const { data, promptVersion } = await scorePosting(provider, { posting: postingText(posting), title, company, place, remote, salary, profile }, { ...options, signal });
+    const { data, promptVersion } = await scorePosting(provider, { posting: postingText(posting), title, company, place, remote, salary, profile }, { ...taskOptions, signal });
     return { data, scoredWith: promptVersion };
   };
 }

@@ -195,6 +195,56 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
       )}
 
       <Card className="grid grid-cols-1 gap-x-[18px] gap-y-5 sm:grid-cols-2">
+        {provider === "OPENAI" && (
+          <div className="sm:col-span-2 flex flex-col gap-2 pb-1 border-b border-line pb-4">
+            <span className="text-label text-muted">Local & Custom CLI Presets</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBaseUrl("http://localhost:4096/v1");
+                  setModel("opencode");
+                  setOtherModel(false);
+                  setKeyInput("");
+                  changed();
+                  setSaveNow((c) => c + 1);
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-card border text-xs font-medium transition-all",
+                  baseUrl === "http://localhost:4096/v1"
+                    ? "border-primary bg-selected text-ink shadow-[0_0_0_1px_var(--color-primary)]"
+                    : "border-line-card bg-card text-muted hover:border-line-strong hover:text-ink",
+                )}
+              >
+                Local OpenCode CLI (localhost:4096)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBaseUrl("local");
+                  setModel("gemini-3.8-flash-high");
+                  setOtherModel(false);
+                  setKeyInput("");
+                  changed();
+                  setSaveNow((c) => c + 1);
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-card border text-xs font-medium transition-all",
+                  baseUrl === "local"
+                    ? "border-primary bg-selected text-ink shadow-[0_0_0_1px_var(--color-primary)]"
+                    : "border-line-card bg-card text-muted hover:border-line-strong hover:text-ink",
+                )}
+              >
+                Local AGY CLI (Google Antigravity)
+              </button>
+            </div>
+            <p className="text-xs text-muted">
+              {baseUrl === "http://localhost:4096/v1" && "OpenCode local API at localhost:4096 — no API key needed."}
+              {baseUrl === "local" && "Direct local agy CLI via ~/.local/bin/agy — no API key needed."}
+            </p>
+          </div>
+        )}
+
         <Input
           className="sm:col-span-2"
           label="Server address"
@@ -212,8 +262,8 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
             flush();
           }}
           hint={
-            urlLeft && baseUrl.trim() && !looksLikeUrl(baseUrl)
-              ? "Start the address with http:// or https://."
+            urlLeft && baseUrl.trim() && !looksLikeUrl(baseUrl) && baseUrl.trim() !== "local"
+              ? "Start the address with http:// or https://, or use 'local' for agy CLI."
               : option.urlHint
           }
         />
@@ -262,16 +312,24 @@ export function AiProviderSection({ initial }: { initial: AiSettingsView }) {
           <div className="flex flex-col gap-2.5">
             <Input
               label={option.apiKey.label}
-              hint={keyState === "unreadable" ? undefined : option.apiKey.hint}
+              hint={
+                baseUrl === "local" || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
+                  ? "Not needed for local OpenCode or local AGY CLI."
+                  : keyState === "unreadable"
+                    ? undefined
+                    : option.apiKey.hint
+              }
               type="password"
               autoComplete="off"
               value={keyInput}
               placeholder={
-                keyState === "set"
-                  ? "Saved · type a new key to replace it"
-                  : keyState === "env"
-                    ? "Using DOSSIER_AI_KEY · type one to save it here"
-                    : "Stored encrypted on your server"
+                baseUrl === "local" || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")
+                  ? "Not needed for local OpenCode / AGY CLI"
+                  : keyState === "set"
+                    ? "Saved · type a new key to replace it"
+                    : keyState === "env"
+                      ? "Using DOSSIER_AI_KEY · type one to save it here"
+                      : "Stored encrypted on your server"
               }
               error={keyState === "unreadable" ? API_KEY_UNREADABLE : undefined}
               onChange={(event) => setKeyInput(event.target.value)}

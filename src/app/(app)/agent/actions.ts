@@ -31,6 +31,7 @@ export const saveAgentSettings = action(
     maxScores: z.number().int().min(1).max(30).optional(),
     maxDrafts: z.number().int().min(0).max(10).optional(),
     autoDraft: z.boolean().optional(),
+    aiEngine: z.enum(["primary", "opencode", "agy", "custom"]).optional(),
   }).strict(),
   async (changes) => {
     if (changes.enabled) {
@@ -44,6 +45,7 @@ export const saveAgentSettings = action(
       agentMaxScores: changes.maxScores,
       agentMaxDrafts: changes.maxDrafts,
       agentAutoDraft: changes.autoDraft,
+      agentAiEngine: changes.aiEngine,
     });
     revalidatePath("/agent");
     revalidatePath("/settings");

@@ -1,5 +1,6 @@
 import "server-only";
 
+import fs from "node:fs";
 import { chromium, type Browser } from "playwright-core";
 
 import { env } from "@/lib/env";
@@ -39,10 +40,48 @@ function appOrigin(): string {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
+/** Error thrown when headless Chromium cannot run or render a print page. */
+export class PdfRenderError extends Error {
+  readonly printPath: string;
+  constructor(message: string, printPath: string) {
+    super(message);
+    this.name = "PdfRenderError";
+    this.printPath = printPath;
+  }
+}
+
+export function isPdfRenderError(error: unknown): error is PdfRenderError {
+  return error instanceof Error && error.name === "PdfRenderError";
+}
+
+function findBrowserExecutable(): string | undefined {
+  const envPath =
+    process.env.CHROMIUM_EXECUTABLE_PATH ||
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+    process.env.CHROME_PATH;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  const standardPaths = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ];
+  for (const candidate of standardPaths) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 function browser(): Promise<Browser> {
   if (!pool.browser) {
+    const executablePath = findBrowserExecutable();
     const launching = chromium
       .launch({
+        ...(executablePath ? { executablePath } : {}),
         // Docker gives /dev/shm only 64 MB.
         args: ["--disable-dev-shm-usage"],
       })
@@ -96,7 +135,16 @@ export async function renderPdf(path: string): Promise<Uint8Array> {
   await acquire();
   try {
     const origin = appOrigin();
-    const context = await (await browser()).newContext({
+    let openBrowser: Browser;
+    try {
+      openBrowser = await browser();
+    } catch (launchError) {
+      throw new PdfRenderError(
+        "Direct server PDF generation is unavailable in this environment. Please use the print preview to print or save to PDF directly.",
+        path,
+      );
+    }
+    const context = await openBrowser.newContext({
       extraHTTPHeaders: { [PRINT_TOKEN_HEADER]: await signPrintToken(path) },
     });
     try {

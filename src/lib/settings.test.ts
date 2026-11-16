@@ -76,6 +76,7 @@ describe("stored settings", () => {
       agentMaxScores: 15,
       agentMaxDrafts: 3,
       agentAutoDraft: false,
+      agentAiEngine: "primary",
       agentRuns: [],
       startupsViewedAt: null,
       startupsLastRefresh: null,
@@ -108,6 +109,19 @@ describe("stored settings", () => {
       connectorEnabledAt: null,
       connectorRedirects: [],
       browserTimeZone: null,
+      automationCustomApi: false,
+      automationPreset: "custom",
+      automationBaseUrl: null,
+      automationModel: null,
+      automationApiKeyEnc: null,
+      automationTimeoutSeconds: null,
+      automationIntervalHours: 24,
+      automationAutoFollowUp: true,
+      automationFollowUpDays: 7,
+      automationAtsOptimize: true,
+      automationAutoClassify: true,
+      automationLastRunAt: null,
+      automationLastRunMessage: null,
     });
   });
 

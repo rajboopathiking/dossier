@@ -228,7 +228,13 @@ export class OpenAICompatibleProvider extends BaseProvider {
 
   protected async fetchModels(signal: AbortSignal): Promise<string[]> {
     const ids: string[] = [];
-    for await (const model of this.client.models.list({ signal })) ids.push(model.id);
+    try {
+      for await (const model of this.client.models.list({ signal })) ids.push(model.id);
+    } catch {
+      // Many custom/compatible endpoints (like OpenCode or custom proxies) do not support the models list endpoint.
+      // Return whatever models were fetched (or empty) rather than failing.
+      return ids;
+    }
     return ids.sort((a, b) => a.localeCompare(b));
   }
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
+import { apiKeyState } from "@/lib/ai/api-key";
+import { loadAutomationConfig } from "@/lib/ai/automation";
 import { loadAiConfig, loadAiSettingsView } from "@/lib/ai/config";
 import { jobSearchView, loadJobSearchConfig } from "@/lib/job-search/config";
 import { COUNTRIES } from "@/lib/job-search/countries";
@@ -27,6 +29,7 @@ import { availableUpdate } from "@/lib/update-check";
 import { USAGE_PING_HOST, usagePingChoice } from "@/lib/usage-ping";
 
 import { AgentSection } from "./agent-section";
+import { AutomationSection } from "./automation-section";
 import { AiBehaviour } from "./ai-behaviour";
 import { AiProviderSection } from "./ai-provider-section";
 import { DataSection } from "./data-section";
@@ -68,6 +71,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             maxScores: settings.agentMaxScores,
             maxDrafts: settings.agentMaxDrafts,
             autoDraft: settings.agentAutoDraft,
+            aiEngine: settings.agentAiEngine,
           }}
           searches={await listAgentSearches()}
           suggestedQuery={(await loadSearch())?.query}
@@ -76,6 +80,13 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           countries={COUNTRIES}
           timeZone={await lastKnownTimeZone()}
           onlyWhileOpen={isDesktopApp()}
+        />
+      ) : section === "automation" ? (
+        <AutomationSection
+          initial={await loadAutomationConfig()}
+          keyState={apiKeyState(settings.automationApiKeyEnc)}
+          primaryModel={(await loadAiConfig()).model ?? "System Default"}
+          agentAiEngine={settings.agentAiEngine}
         />
       ) : section === "google" ? (
         <>
@@ -152,7 +163,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 /** What scores the job agent's postings, and whether it's set up (#274). */
 async function scoringReadiness() {
   const config = await loadScoringConfig();
-  return { scorer: config.scorer, ready: (await scoringProblem(config)) === null };
+  return { scorer: config.scorer, ready: (await scoringProblem(config, { forAgent: true })) === null };
 }
 
 

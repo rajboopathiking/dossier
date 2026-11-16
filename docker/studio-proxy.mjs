@@ -13,8 +13,4 @@ net
     client.pipe(studio).pipe(client);
     client.on("error", () => studio.destroy());
     studio.on("error", () => client.destroy());
-  })
-  // Docker maps the container's hostname to its network address. Binding that
-  // instead of 0.0.0.0 leaves 127.0.0.1:5555 free for Studio, so the URL
-  // Studio prints stays correct.
-  .listen(port, os.hostname());
+  }).listen(port, os.hostname());
