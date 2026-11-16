@@ -155,3 +155,4 @@ Working on Dossier itself: see [DEVELOPMENT.md](DEVELOPMENT.md).
 ## License
 
 Dossier is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use, change and share it; if you run a changed version for others over a network, you must offer them its source code.
+# dossier
