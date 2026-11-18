@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   // The production image runs .next/standalone: the server and only the files
   // it needs (E12-1).
   output: "standalone",

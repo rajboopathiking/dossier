@@ -1,17 +1,9 @@
-import { argon2, randomBytes, timingSafeEqual } from "node:crypto";
+import * as crypto from "node:crypto";
 import { promisify } from "node:util";
 
-// DOSSIER_PASSWORD holds an argon2id hash of the sign-in password, never the
-// password itself, so reading the environment doesn't reveal it. The hash is
-// written as
-//
-//   argon2id:m=<memory in KiB>,t=<passes>,p=<lanes>:<salt>:<hash>
-//
-// with the salt and hash in base64url. Unlike the usual $argon2id$v=19$… form
-// it has no "$", because Next.js and Docker Compose expand "$" in .env files,
-// even inside quotes. No "server-only": scripts/hash-password.ts uses it too.
-
-const derive = promisify(argon2);
+const { randomBytes, timingSafeEqual } = crypto;
+const cryptoArgon2 = (crypto as unknown as { argon2?: (...args: unknown[]) => void }).argon2;
+const derive = typeof cryptoArgon2 === "function" ? promisify(cryptoArgon2) : null;
 
 /** OWASP's recommended argon2id settings: 19 MiB of memory, 2 passes, 1 lane. */
 const DEFAULTS = { memory: 19_456, passes: 2, parallelism: 1 };
@@ -50,8 +42,13 @@ export function isPasswordHash(value: string): boolean {
   return parsePasswordHash(value) !== null;
 }
 
-function compute(password: string, { memory, passes, parallelism, salt }: Omit<PasswordHash, "hash">, length: number) {
-  return derive("argon2id", { message: password, nonce: salt, memory, passes, parallelism, tagLength: length });
+async function compute(password: string, { memory, passes, parallelism, salt }: Omit<PasswordHash, "hash">, length: number): Promise<Buffer> {
+  if (!derive) {
+    throw new Error(
+      "Node.js 24+ is required for built-in crypto.argon2. Please install and switch to Node 24 (nvm install 24 && nvm use 24).",
+    );
+  }
+  return derive("argon2id", { message: password, nonce: salt, memory, passes, parallelism, tagLength: length }) as Promise<Buffer>;
 }
 
 /** Hashes `password` with a fresh random salt, for DOSSIER_PASSWORD. */
