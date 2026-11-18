@@ -26,7 +26,10 @@ services:
       retries: 10
 
   app:
-    image: ${DOSSIER_IMAGE:-ghcr.io/aientech/dossier:latest}
+    build:
+      context: .
+      target: production
+    image: ${DOSSIER_IMAGE:-dossier:latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -38,9 +41,9 @@ services:
       DOSSIER_BACKUP_RETENTION_DAYS: ${DOSSIER_BACKUP_RETENTION_DAYS:-}
       # Your time zone, e.g. Europe/Berlin: nightly backups run at 03:00 in it.
       TZ: ${TZ:-UTC}
-      DOSSIER_AI_PROVIDER: ${DOSSIER_AI_PROVIDER:-}
-      DOSSIER_AI_URL: ${DOSSIER_AI_URL:-}
-      DOSSIER_AI_MODEL: ${DOSSIER_AI_MODEL:-}
+      DOSSIER_AI_PROVIDER: ${DOSSIER_AI_PROVIDER:-openai}
+      DOSSIER_AI_URL: ${DOSSIER_AI_URL:-http://host.docker.internal:4096/v1}
+      DOSSIER_AI_MODEL: ${DOSSIER_AI_MODEL:-opencode}
       DOSSIER_AI_KEY: ${DOSSIER_AI_KEY:-}
       DOSSIER_AI_TIMEOUT_SECONDS: ${DOSSIER_AI_TIMEOUT_SECONDS:-}
       # The daily usage ping: unset, Dossier asks after sign-in; on or off answers in advance (see Privacy in the wiki).
@@ -61,9 +64,8 @@ services:
       DOSSIER_GOOGLE_CLIENT_SECRET: ${DOSSIER_GOOGLE_CLIENT_SECRET:-}
       # The address Dossier is reached at, for Google's redirect.
       DOSSIER_PUBLIC_URL: ${DOSSIER_PUBLIC_URL:-}
-    # Only on the server itself: put a reverse proxy with HTTPS in front.
     ports:
-      - "127.0.0.1:${DOSSIER_PORT:-3000}:3000"
+      - "${DOSSIER_BIND_IP:-0.0.0.0}:${DOSSIER_PORT:-3000}:3000"
     volumes:
       - data:/data
     # Room for Chromium, which prints the PDFs.

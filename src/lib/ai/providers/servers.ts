@@ -57,7 +57,7 @@ export const SERVERS: readonly Server[] = [
       url.hostname === "opencode.ai" ||
       url.hostname.endsWith(".opencode.ai") ||
       url.hostname.includes("opencode") ||
-      ((url.hostname === "localhost" || url.hostname === "127.0.0.1") && (url.port === "4096" || url.pathname.includes("opencode"))),
+      ((url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "host.docker.internal") && (url.port === "4096" || url.pathname.includes("opencode"))),
     path: (path) => (!path || path === "/" || path === "/openai" ? "/v1" : path.replace(/\/openai(\/v1)?$/, "/v1")),
     headers: () => ({
       "User-Agent": `Dossier/${appVersion} (+https://github.com/AienTech/dossier)`,
@@ -103,9 +103,19 @@ export function ignoresSchemas(baseURL: string, model: string): boolean {
 
 /** `baseURL` with the path its server's API is at; other addresses as they are. */
 export function apiAddress(baseURL: string): string {
-  const path = serverAt(baseURL)?.path;
-  if (!path) return baseURL;
+  if (!URL.canParse(baseURL)) return baseURL;
   const url = new URL(baseURL);
+
+  // In Docker, localhost points to the container. Map common local AI ports to host.docker.internal
+  const inDocker = Boolean(process.env.DATABASE_URL?.includes("@db:") || process.env.HOSTNAME === "0.0.0.0");
+  if (inDocker && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
+    if (url.port === "4096" || url.port === "11434" || url.port === "1234") {
+      url.hostname = "host.docker.internal";
+    }
+  }
+
+  const path = serverAt(url.href)?.path;
+  if (!path) return withoutSlashes(url.href);
   url.pathname = path(withoutSlashes(url.pathname));
   return withoutSlashes(url.href);
 }

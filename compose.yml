@@ -27,8 +27,15 @@ services:
     environment:
       # Overrides the localhost URL in .env, which is meant for tools run on the host.
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-dossier}
+      DOSSIER_PASSWORD: ${DOSSIER_PASSWORD:-}
+      DOSSIER_SECRET: ${DOSSIER_SECRET:-}
+      DOSSIER_AI_PROVIDER: ${DOSSIER_AI_PROVIDER:-openai}
+      DOSSIER_AI_URL: ${DOSSIER_AI_URL:-http://host.docker.internal:4096/v1}
+      DOSSIER_AI_MODEL: ${DOSSIER_AI_MODEL:-opencode}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "3000:3000"
+      - "${DOSSIER_PORT:-3000}:3000"
     volumes:
       - .:/app
       # Keep the container's own (Debian) node_modules and build cache
