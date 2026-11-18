@@ -27,7 +27,7 @@ export const DEFAULT_AGY_MODELS = [
  * Finds the local agy CLI executable on the system.
  */
 export function findAgyBinary(): string | null {
-  if (process.env.AGY_PATH && existsSync(process.env.AGY_PATH)) {
+  if (process.env.AGY_PATH && existsSync(/*turbopackIgnore: true*/ process.env.AGY_PATH)) {
     return process.env.AGY_PATH;
   }
   const home = homedir();
@@ -39,7 +39,7 @@ export function findAgyBinary(): string | null {
     "/app/bin/agy",
   ];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) {
+    if (existsSync(/*turbopackIgnore: true*/ candidate)) {
       return candidate;
     }
   }

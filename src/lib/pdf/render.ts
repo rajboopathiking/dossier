@@ -59,7 +59,7 @@ function findBrowserExecutable(): string | undefined {
     process.env.CHROMIUM_EXECUTABLE_PATH ||
     process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
     process.env.CHROME_PATH;
-  if (envPath && fs.existsSync(envPath)) return envPath;
+  if (envPath && fs.existsSync(/*turbopackIgnore: true*/ envPath)) return envPath;
 
   const standardPaths = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -71,7 +71,7 @@ function findBrowserExecutable(): string | undefined {
     "/usr/bin/chromium-browser",
   ];
   for (const candidate of standardPaths) {
-    if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(/*turbopackIgnore: true*/ candidate)) return candidate;
   }
   return undefined;
 }

@@ -60,7 +60,7 @@ export async function listBackups(): Promise<{ name: string; modified: Date }[]>
   const files: { name: string; modified: Date }[] = [];
   const seen = new Set<string>();
   for (const dir of candidateDirs) {
-    const names = (await readdir(dir).catch(() => [])).filter((name) => /^dossier-backup-.*\.json$/.test(name));
+    const names = (await readdir(/*turbopackIgnore: true*/ dir).catch(() => [])).filter((name) => /^dossier-backup-.*\.json$/.test(name));
     for (const name of names) {
       if (!seen.has(name)) {
         seen.add(name);
