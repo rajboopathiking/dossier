@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
-    "postinstall": "prisma generate && prisma generate --schema prisma/sqlite/schema.prisma",
+    "postinstall": "prisma generate --schema prisma/schema.prisma && prisma generate --schema prisma/sqlite/schema.prisma",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "hash-password": "tsx scripts/hash-password.ts",
-    "generate": "prisma generate && prisma generate --schema prisma/sqlite/schema.prisma",
+    "generate": "prisma generate --schema prisma/schema.prisma && prisma generate --schema prisma/sqlite/schema.prisma",
     "sqlite-schema": "tsx prisma/sqlite/derive.ts"
   },
   "dependencies": {
