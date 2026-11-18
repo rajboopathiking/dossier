@@ -5,6 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
+    "postinstall": "prisma generate && prisma generate --schema prisma/sqlite/schema.prisma",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

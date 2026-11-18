@@ -35,6 +35,8 @@ export function findAgyBinary(): string | null {
     join(home, ".local", "bin", "agy"),
     "/usr/local/bin/agy",
     "/opt/homebrew/bin/agy",
+    "/host-bin/agy",
+    "/app/bin/agy",
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
