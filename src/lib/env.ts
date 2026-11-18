@@ -95,10 +95,12 @@ const schema = z.object({
     }),
   ),
   DOSSIER_AI_URL: optional(
-    z.url({
-      protocol: /^https?$/,
-      error: "DOSSIER_AI_URL must be an http:// or https:// URL.",
-    }),
+    z.string().trim().refine(
+      (val) => val === "local" || val === "local-cli" || /^https?:\/\//i.test(val),
+      {
+        message: "DOSSIER_AI_URL must be an http:// or https:// URL.",
+      },
+    ),
   ),
   DOSSIER_AI_MODEL: optional(z.string()),
   // Never echo the value: it's an API key.
