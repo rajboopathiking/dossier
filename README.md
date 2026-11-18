@@ -72,44 +72,99 @@ It's for one person on a small server: one password, your data in your own Postg
 
 <sub>The screenshots show the demo data: Jane Doe is made up.</sub>
 
-## Run it on your computer
+## Deploy on AWS EC2 or Linux Server (Native with OpenCode & PM2)
 
-All you need is [Docker Desktop](https://docs.docker.com/desktop/) on macOS or Windows, or Docker Engine with its Compose plugin on Linux, and about 2 GB of free memory. Run the commands in a terminal: macOS's Terminal, Linux, or WSL on Windows.
+You can run Dossier directly on Linux (Amazon Linux / Ubuntu) alongside a local **OpenCode** server without needing Docker.
 
-**1. Fetch the Compose file** into a folder of its own, and make the secrets Dossier needs:
+### 1. Prerequisites
+- Node.js 20+ (Node 22 or 24 recommended)
+- Chromium: `sudo dnf install -y chromium` (or `sudo apt install -y chromium-browser`)
+- PM2: `sudo npm install -g pm2`
+- OpenCode: `curl -fsSL https://opencode.ai/install.sh | bash`
 
+### 2. Setup Dossier
 ```bash
-mkdir ~/dossier && cd ~/dossier
-curl -fsSL -o compose.yml https://raw.githubusercontent.com/AienTech/dossier/main/compose.production.yml
-echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
-echo "DOSSIER_SECRET=$(openssl rand -base64 32)" >> .env
+git clone https://github.com/rajboopathiking/dossier.git ~/dossier
+cd ~/dossier
+npm install
+npm run generate
+
+# Initialize SQLite database and directory
+mkdir -p ~/dossier-data
+npx prisma migrate deploy --schema prisma/sqlite/schema.prisma
+npx prisma db seed --schema prisma/sqlite/schema.prisma
 ```
 
-**2. Choose your password.** This asks for it twice and prints a hash of it, one line that starts with `argon2id:`:
-
+### 3. Generate Secrets and `.env`
 ```bash
-docker run --rm -it ghcr.io/aientech/dossier hash-password
+cp .env.example .env
+
+# Generate secret and hash password:
+SECRET=$(openssl rand -base64 32)
+PASSWORD_HASH=$(npx tsx scripts/hash-password.ts "YourSecurePassword")
+```
+Edit `.env` and set:
+```env
+DOSSIER_SECRET="<YOUR_SECRET>"
+DOSSIER_PASSWORD="<YOUR_PASSWORD_HASH>"
+DATABASE_URL="file:/home/ec2-user/dossier-data/dossier.db"
+DOSSIER_DATA_DIR=/home/ec2-user/dossier-data
+PORT=3000
+CHROME_PATH=/usr/bin/chromium
+
+# Local AI Provider (OpenCode on port 4096)
+DOSSIER_AI_PROVIDER=openai
+DOSSIER_AI_URL=http://127.0.0.1:4096/v1
+DOSSIER_AI_MODEL=opencode
 ```
 
-Add that line to `.env` as `DOSSIER_PASSWORD=argon2id:…`, with any text editor. Dossier only keeps the hash, never the password.
-
-**3. Start it:**
-
+### 4. Build & Start Both with PM2
 ```bash
-docker compose up -d
+npm run build
+
+# Start OpenCode server:
+pm2 start "opencode serve --port 4096 --hostname 127.0.0.1" --name "opencode"
+
+# Start Dossier:
+pm2 start npm --name "dossier" -- start
+
+# Persist across server reboots:
+pm2 save
+pm2 startup
 ```
 
-The first start downloads the image (about 1.7 GB) and sets up the database. Open [http://localhost:3000](http://localhost:3000), sign in with your password, and pick an AI model in **Settings → AI provider** (see [Choosing an AI provider](https://github.com/AienTech/dossier/wiki/Choosing-an-AI-provider)).
+> **Note:** If you previously had Docker containers running on port 3000 (`dossier-app-1`), stop them first:
+> `docker stop dossier-app-1 dossier-db-1 && docker rm dossier-app-1 dossier-db-1`
 
-`docker compose stop` stops it and `docker compose start` starts it again, with your data kept.
+---
 
-**Without a database server:** Dossier can keep its data in an SQLite file instead, in one container. Put `DATABASE_URL=file:/data/dossier.db` in `.env` and run the image on its own, with a volume for `/data`:
+## Run with Docker Compose (With Local Build & OpenCode / AGY Support)
 
+To run Dossier in Docker with all your custom changes (OpenCode, AGY CLI, PDF rendering fixes), build the container locally instead of pulling the outdated upstream image:
+
+### 1. Build and Start Container
 ```bash
-docker run -d --name dossier --env-file .env -v dossier-data:/data -p 127.0.0.1:3000:3000 ghcr.io/aientech/dossier
-```
+# Start your local OpenCode server on the host (port 4096):
+opencode serve --port 4096 --hostname 0.0.0.0 &
 
-Without that volume, the next upgrade deletes the data, and the container warns about it when it starts. To back up the file, stop the container and copy `dossier.db` out of the volume. PostgreSQL stays the better choice on a shared server; to move between the two, export your data in Settings → Your data and import it on the other. It's only reachable from your own computer. The [installation guide's Docker Compose page](https://github.com/AienTech/dossier/wiki/Run-locally-with-Docker-Compose) has more: another port, your time zone, upgrades and removing it.
+# Build and start Dossier with Docker Compose:
+docker compose -f compose.production.yml up -d --build
+```
+*(Or use `docker compose up -d --build` for the development setup)*
+
+### 2. Configure `.env` for Docker
+In your `.env`:
+```env
+DOSSIER_SECRET="<YOUR_SECRET>"
+DOSSIER_PASSWORD="<YOUR_PASSWORD_HASH>"
+POSTGRES_PASSWORD="<RANDOM_POSTGRES_PASSWORD>"
+
+# Connect Dossier inside Docker to OpenCode on host:
+DOSSIER_AI_PROVIDER=openai
+DOSSIER_AI_URL=http://host.docker.internal:4096/v1
+DOSSIER_AI_MODEL=opencode
+```
+> **Note:** Dossier inside Docker automatically resolves `http://localhost:4096/v1` to `http://host.docker.internal:4096/v1` via Docker's host gateway.
 
 ## Self-hosting
 
