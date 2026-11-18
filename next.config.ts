@@ -5,6 +5,19 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Allow Server Actions through reverse proxy (e.g. DuckDNS, custom domains)
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "dossier-app.duckdns.org",
+        "*.duckdns.org",
+        "localhost:3000",
+        "127.0.0.1:3000",
+        "16.179.35.3:3000",
+        "16.179.35.3",
+      ],
+    },
+  },
   // The production image runs .next/standalone: the server and only the files
   // it needs (E12-1).
   output: "standalone",
