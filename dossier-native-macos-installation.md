@@ -241,18 +241,23 @@ Do not repeatedly run:
 npx playwright install chromium
 ```
 
-Practical choices:
+Practical choices and optimization for older / resource-constrained Macs:
 
-1.  **Keep using Dossier without PDF features for now**, if the rest of
-    the application works.
-2.  **Upgrade macOS**, if your Intel Mac officially supports a newer
-    macOS version compatible with the Playwright release used by this
-    project.
-3.  **Run PDF generation on a compatible Linux machine/server**, while
-    keeping local development on this Mac.
-4.  **Test an older Playwright/browser combination only as a separate
-    compatibility experiment.** Do not downgrade the project's locked
-    dependencies blindly; it may introduce other incompatibilities.
+1.  **Remove heavy Chromium / Playwright binaries to reclaim ~1 GB:**
+    Headless Chromium binaries and Playwright caches in `~/Library/Caches/ms-playwright` take nearly 1 GB of disk space and consume 400MB–600MB+ RAM when loaded. If installed, remove them:
+    ```bash
+    rm -rf ~/Library/Caches/ms-playwright
+    npx playwright uninstall --all 2>/dev/null || true
+    ```
+2.  **Generate PDFs on your Cloud Server (Recommended):**
+    When deploying Dossier to an EC2 instance or Linux VPS (e.g. `https://dossier-app.duckdns.org`), the server handles 100% of PDF rendering using its system Chrome (`/usr/bin/google-chrome`), imposing zero CPU/RAM load on your MacBook.
+3.  **Use Browser Print Preview locally:**
+    When running Dossier locally, open the resume or cover letter print URL (e.g. `http://localhost:3000/applications/<id>/resume/print`) and press `Cmd + P` → **Save as PDF**. This uses macOS's native Quartz engine for full vector quality without running headless Chromium.
+4.  **Use your existing Google Chrome:**
+    If Google Chrome is already installed on your Mac, configure Dossier to reuse it without downloading extra binaries:
+    ```env
+    CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    ```
 
 ## 11. Common errors and fixes
 

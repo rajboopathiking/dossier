@@ -166,6 +166,25 @@ DOSSIER_AI_MODEL=opencode
 ```
 > **Note:** Dossier inside Docker automatically resolves `http://localhost:4096/v1` to `http://host.docker.internal:4096/v1` via Docker's host gateway.
 
+## Older Mac & Low-Resource Optimization (Chromium Removal)
+
+If you are developing locally on an older MacBook (e.g., macOS Monterey 12.x or machines with 8 GB RAM), bundled Playwright Chromium is **heavy (~1 GB disk space, 400MB–600MB+ RAM)** and causes `dyld` missing symbol crashes on older macOS versions.
+
+### Reclaim ~1 GB of Disk Space
+Run the following in your Mac terminal to purge cached Playwright binaries:
+```bash
+rm -rf ~/Library/Caches/ms-playwright
+npx playwright uninstall --all 2>/dev/null || true
+```
+
+### PDF Generation Alternatives for Older Macs
+1. **Cloud Server Rendering (Recommended):** Deploy Dossier to your AWS EC2 instance (e.g., `https://dossier-app.duckdns.org`). The EC2 server handles 100% of PDF generation via its system Google Chrome (`/usr/bin/google-chrome`), requiring zero CPU or RAM on your MacBook.
+2. **Browser Print Preview:** Open the resume or cover letter print preview URL (`/applications/<id>/resume/print`) and press `Cmd + P` → **Save as PDF** in your normal web browser.
+3. **Use Existing Google Chrome:** If Google Chrome is already installed on your Mac, configure Dossier in `.env` to reuse it instead of downloading extra binaries:
+   ```env
+   CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+   ```
+
 ## Self-hosting
 
 To put Dossier on a server, on your own domain with HTTPS, follow the [installation guide](https://github.com/AienTech/dossier/wiki#self-host-on-a-server): a plain Ubuntu server with Docker Compose and Caddy (or Node.js, without Docker), CapRover, Coolify or Dokploy. Give the server at least 2 vCPUs and 2 GB of memory (see [Performance and sizing](#performance-and-sizing)).
